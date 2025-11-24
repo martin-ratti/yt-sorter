@@ -11,14 +11,14 @@ class Track:
 
     def to_dict(self):
         return {
-            'title': self.title,
-            'artist': self.artist,
-            'album': self.album,
-            'duration': self.duration_seconds
+            "title": self.title,
+            "artist": self.artist,
+            "album": self.album,
+            "duration": self.duration_seconds
         }
 
 class PlaylistSorter:
-    \"\"\"Lógica pura de ordenamiento.\"\"\"
+    """Lógica pura de ordenamiento."""
     
     @staticmethod
     def sort_tracks(tracks: List[Track], criteria: str) -> List[Track]:
