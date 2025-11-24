@@ -11,15 +11,16 @@ class YTService:
     def __init__(self):
         self.api = None
 
-    # --- GESTIÓN DE SESIÓN ---
     def save_session(self, headers: Dict):
+        """Guarda la sesión localmente para futuros accesos."""
         try:
             with open(AUTH_FILE, 'w', encoding='utf-8') as f:
                 json.dump(headers, f, indent=4)
         except Exception as e:
-            print(f"Advertencia: No se pudo guardar auth.json: {e}")
+            print(f"Warning: No se pudo guardar sesión: {e}")
 
     def load_session(self) -> Optional[str]:
+        """Carga la sesión guardada si existe."""
         if os.path.exists(AUTH_FILE):
             try:
                 with open(AUTH_FILE, 'r', encoding='utf-8') as f:
@@ -28,8 +29,8 @@ class YTService:
                 return None
         return None
 
-    # --- LOGIN ---
     def login(self, raw_text: str) -> bool:
+        """Procesa headers crudos o JSON para autenticar."""
         try:
             headers = {
                 "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36",
@@ -40,6 +41,7 @@ class YTService:
                 "x-origin": "https://music.youtube.com"
             }
 
+            # 1. Intento carga directa JSON
             try:
                 loaded = json.loads(raw_text)
                 if "Cookie" in loaded:
@@ -49,6 +51,7 @@ class YTService:
             except:
                 pass 
 
+            # 2. Parseo de texto crudo (Headers copiados)
             lines = [line.strip() for line in raw_text.split('\n') if line.strip()]
             found_cookie = False
             
@@ -66,87 +69,68 @@ class YTService:
                         found_cookie = True
 
             if not found_cookie:
-                raise ValueError("No encontré la Cookie. Copia todo el bloque.")
+                raise ValueError("Cookie no encontrada en los headers proporcionados.")
 
             self.api = YTMusic(json.dumps(headers))
             self.save_session(headers)
             return True
 
         except Exception as e:
-            raise Exception(f"Login fallido: {str(e)}")
+            raise Exception(f"Fallo de autenticación: {str(e)}")
 
-    # --- DATOS ---
     def fetch_playlists(self) -> List[Dict[str, str]]:
         if not self.api: raise ConnectionError("No autenticado")
         try:
             playlists = self.api.get_library_playlists(limit=200)
             return [{"title": p['title'], "id": p['playlistId']} for p in playlists]
         except Exception as e:
-            raise ConnectionError(f"Error cargando listas: {e}")
+            raise ConnectionError(f"Error obteniendo playlists: {e}")
 
     def fetch_tracks(self, playlist_id: str) -> List[Track]:
+        """Obtiene canciones, filtra duplicados y valida disponibilidad."""
         if not self.api: raise ConnectionError("No autenticado")
         
-        print(f"DEBUG: Descargando playlist ID: {playlist_id}...")
+        print(f"DEBUG: Descargando ID {playlist_id}...")
         playlist_data = self.api.get_playlist(playlist_id, limit=5000)
         tracks_data = playlist_data.get('tracks', [])
         
-        total_found = len(tracks_data)
         clean_tracks = []
         seen_ids = set()
-        duplicates_count = 0
-        unavailable_count = 0
-
-        print("\n--- INICIO DE AUDITORÍA DE DUPLICADOS ---")
+        
+        # Auditoría y limpieza
         for t in tracks_data:
             vid_id = t.get('videoId')
-            title = t.get('title', 'Sin título')
-            
-            # 1. Chequeo de Disponibilidad
-            if not vid_id: 
-                print(f"⚠️ OMITIDO (No disponible): {title}")
-                unavailable_count += 1
-                continue
-            
-            # 2. Chequeo de Duplicados
-            if vid_id in seen_ids:
-                print(f"♻️ DUPLICADO DETECTADO: '{title}' (Ya estaba en la lista)")
-                duplicates_count += 1
-                continue
+            if not vid_id: continue # Omitir no disponibles
+            if vid_id in seen_ids: continue # Omitir duplicados exactos
             
             seen_ids.add(vid_id)
 
-            # Extracción limpia
+            # Extracción segura de metadatos
             artists_list = t.get('artists', [])
-            if isinstance(artists_list, list):
-                artists = ", ".join([a.get('name', 'Unknown') for a in artists_list])
-            else:
-                artists = "Unknown"
-
+            artists = ", ".join([a.get('name', 'Unknown') for a in artists_list]) if isinstance(artists_list, list) else "Unknown"
+            
             album_data = t.get('album')
             album = album_data.get('name', 'Unknown') if isinstance(album_data, dict) else 'Unknown'
             
             clean_tracks.append(Track(
                 id=vid_id,
-                title=title,
+                title=t.get('title', 'Unknown Title'),
                 artist=artists,
                 album=album,
                 duration_seconds=t.get('duration_seconds', 0) or 0
             ))
-        print("--- FIN DE AUDITORÍA ---\n")
             
-        print(f"--------------------------------------------------")
-        print(f"REPORTE FINAL: Leídos: {total_found} | Duplicados: {duplicates_count} | Únicos: {len(clean_tracks)}")
-        print(f"--------------------------------------------------")
         return clean_tracks
 
     def create_playlist(self, title: str, track_ids: List[str]):
+        """Crea playlist y sube canciones en lotes controlados."""
         if not self.api: raise ConnectionError("No autenticado")
         
-        print(f"DEBUG: Creando playlist '{title}'...")
+        print(f"DEBUG: Creando '{title}'...")
         playlist_id = self.api.create_playlist(title, description="Ordenada con YTSorter")
         
-        batch_size = 20
+        # Configuración "Safe Mode" para evitar bloqueos
+        batch_size = 10 
         total_batches = (len(track_ids) + batch_size - 1) // batch_size
         
         for i in range(0, len(track_ids), batch_size):
@@ -156,13 +140,12 @@ class YTService:
             retries = 3
             while retries > 0:
                 try:
-                    # Aquí he quitado la verificación estricta que daba el falso positivo
                     self.api.add_playlist_items(playlist_id, batch)
-                    print(f"Lote {current_batch}/{total_batches}: OK ({len(batch)} canciones)")
-                    time.sleep(2)
+                    print(f"Lote {current_batch}/{total_batches}: OK")
+                    time.sleep(2) # Pausa obligatoria
                     break
                 except Exception as e:
-                    print(f"ERROR Lote {current_batch}: {e}. Reintentando...")
+                    print(f"Error en lote {current_batch}: {e}. Reintentando...")
                     retries -= 1
                     time.sleep(5)
             
