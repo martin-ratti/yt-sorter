@@ -1,7 +1,8 @@
 ﻿import json
 import time
 import os
-from typing import List, Dict, Optional
+import re # <--- Nuevo: Regex
+from typing import List, Dict, Optional, Callable
 from ytmusicapi import YTMusic
 from src.core.entities import Track
 
@@ -11,8 +12,8 @@ class YTService:
     def __init__(self):
         self.api = None
 
+    # --- GESTIÓN DE SESIÓN ---
     def save_session(self, headers: Dict):
-        """Guarda la sesión localmente para futuros accesos."""
         try:
             with open(AUTH_FILE, 'w', encoding='utf-8') as f:
                 json.dump(headers, f, indent=4)
@@ -20,7 +21,6 @@ class YTService:
             print(f"Warning: No se pudo guardar sesión: {e}")
 
     def load_session(self) -> Optional[str]:
-        """Carga la sesión guardada si existe."""
         if os.path.exists(AUTH_FILE):
             try:
                 with open(AUTH_FILE, 'r', encoding='utf-8') as f:
@@ -29,8 +29,8 @@ class YTService:
                 return None
         return None
 
+    # --- LOGIN MEJORADO CON REGEX ---
     def login(self, raw_text: str) -> bool:
-        """Procesa headers crudos o JSON para autenticar."""
         try:
             headers = {
                 "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36",
@@ -41,7 +41,7 @@ class YTService:
                 "x-origin": "https://music.youtube.com"
             }
 
-            # 1. Intento carga directa JSON
+            # 1. Intento JSON directo
             try:
                 loaded = json.loads(raw_text)
                 if "Cookie" in loaded:
@@ -51,25 +51,22 @@ class YTService:
             except:
                 pass 
 
-            # 2. Parseo de texto crudo (Headers copiados)
-            lines = [line.strip() for line in raw_text.split('\n') if line.strip()]
-            found_cookie = False
-            
-            for i, line in enumerate(lines):
-                line_clean = line.lower().replace(":", "").strip()
-                if line_clean == "cookie" and i + 1 < len(lines):
-                    headers["Cookie"] = lines[i+1]
-                    found_cookie = True
-                elif line_clean == "authorization" and i + 1 < len(lines):
-                    headers["Authorization"] = lines[i+1]
-                elif "cookie:" in line.lower() and not found_cookie:
-                    parts = line.split(":", 1)
-                    if len(parts) > 1:
-                        headers["Cookie"] = parts[1].strip()
-                        found_cookie = True
+            # 2. Parseo Robusto con Regex
+            # Busca "Cookie" seguido de : y captura todo hasta el final de linea
+            cookie_match = re.search(r"(?i)cookie[:=]\s*(.+)", raw_text)
+            auth_match = re.search(r"(?i)authorization[:=]\s*(.+)", raw_text)
 
-            if not found_cookie:
-                raise ValueError("Cookie no encontrada en los headers proporcionados.")
+            if cookie_match:
+                headers["Cookie"] = cookie_match.group(1).strip()
+            else:
+                # Fallback manual por si el regex falla
+                if "VISITOR" in raw_text:
+                     headers["Cookie"] = raw_text.strip()
+                else:
+                     raise ValueError("No encontré la Cookie. Asegúrate de copiar el bloque completo.")
+
+            if auth_match:
+                headers["Authorization"] = auth_match.group(1).strip()
 
             self.api = YTMusic(json.dumps(headers))
             self.save_session(headers)
@@ -78,6 +75,7 @@ class YTService:
         except Exception as e:
             raise Exception(f"Fallo de autenticación: {str(e)}")
 
+    # --- DATOS ---
     def fetch_playlists(self) -> List[Dict[str, str]]:
         if not self.api: raise ConnectionError("No autenticado")
         try:
@@ -87,7 +85,6 @@ class YTService:
             raise ConnectionError(f"Error obteniendo playlists: {e}")
 
     def fetch_tracks(self, playlist_id: str) -> List[Track]:
-        """Obtiene canciones, filtra duplicados y valida disponibilidad."""
         if not self.api: raise ConnectionError("No autenticado")
         
         print(f"DEBUG: Descargando ID {playlist_id}...")
@@ -97,15 +94,14 @@ class YTService:
         clean_tracks = []
         seen_ids = set()
         
-        # Auditoría y limpieza
-        for t in tracks_data:
+        # Ahora guardamos el índice original (i)
+        for i, t in enumerate(tracks_data):
             vid_id = t.get('videoId')
-            if not vid_id: continue # Omitir no disponibles
-            if vid_id in seen_ids: continue # Omitir duplicados exactos
+            if not vid_id: continue 
+            if vid_id in seen_ids: continue
             
             seen_ids.add(vid_id)
 
-            # Extracción segura de metadatos
             artists_list = t.get('artists', [])
             artists = ", ".join([a.get('name', 'Unknown') for a in artists_list]) if isinstance(artists_list, list) else "Unknown"
             
@@ -117,19 +113,21 @@ class YTService:
                 title=t.get('title', 'Unknown Title'),
                 artist=artists,
                 album=album,
-                duration_seconds=t.get('duration_seconds', 0) or 0
+                duration_seconds=t.get('duration_seconds', 0) or 0,
+                original_index=i # Guardamos posición original
             ))
             
         return clean_tracks
 
-    def create_playlist(self, title: str, track_ids: List[str]):
-        """Crea playlist y sube canciones en lotes controlados."""
+    def create_playlist(self, title: str, track_ids: List[str], progress_callback: Callable[[str, float], None] = None):
+        """
+        Crea playlist.
+        progress_callback: Función que recibe (mensaje, porcentaje) para actualizar la GUI.
+        """
         if not self.api: raise ConnectionError("No autenticado")
         
-        print(f"DEBUG: Creando '{title}'...")
         playlist_id = self.api.create_playlist(title, description="Ordenada con YTSorter")
         
-        # Configuración "Safe Mode" para evitar bloqueos
         batch_size = 10 
         total_batches = (len(track_ids) + batch_size - 1) // batch_size
         
@@ -137,15 +135,20 @@ class YTService:
             batch = track_ids[i:i + batch_size]
             current_batch = (i // batch_size) + 1
             
+            # Notificar progreso a la GUI
+            if progress_callback:
+                percent = current_batch / total_batches
+                msg = f"Subiendo lote {current_batch}/{total_batches}..."
+                progress_callback(msg, percent)
+            
             retries = 3
             while retries > 0:
                 try:
                     self.api.add_playlist_items(playlist_id, batch)
-                    print(f"Lote {current_batch}/{total_batches}: OK")
-                    time.sleep(2) # Pausa obligatoria
+                    time.sleep(2) 
                     break
                 except Exception as e:
-                    print(f"Error en lote {current_batch}: {e}. Reintentando...")
+                    print(f"Error lote {current_batch}: {e}")
                     retries -= 1
                     time.sleep(5)
             
