@@ -1,118 +1,156 @@
+<h1 align="center">🎵 YTSorter - YouTube Music Manager</h1>
 
------
+<div align="center">
+    <img src="https://img.shields.io/badge/Estado-Producción-success?style=for-the-badge&logo=check&logoColor=white" alt="Estado Badge"/>
+    <img src="https://img.shields.io/badge/Versión-2.3.0-blue?style=for-the-badge" alt="Version Badge"/>
+</div>
 
-# 🎵 YTSorter
+<p align="center">
+    <a href="https://github.com/martin-ratti" target="_blank" style="text-decoration: none;">
+        <img src="https://img.shields.io/badge/👤%20Martín%20Ratti-martin--ratti-000000?style=for-the-badge&logo=github&logoColor=white" alt="Martin"/>
+    </a>
+</p>
 
-**Una aplicación de escritorio potente y segura para ordenar playlists masivas de YouTube Music con control total.**
+<p align="center">
+    <img src="https://img.shields.io/badge/Python-3.10%2B-3776AB?style=for-the-badge&logo=python&logoColor=white" alt="Python Badge"/>
+    <img src="https://img.shields.io/badge/GUI-CustomTkinter-2B2B2B?style=for-the-badge&logo=tkinter&logoColor=white" alt="CustomTkinter Badge"/>
+    <img src="https://img.shields.io/badge/API-YTMusic-FF0000?style=for-the-badge&logo=youtube&logoColor=white" alt="YTMusic Badge"/>
+    <img src="https://img.shields.io/badge/Platform-Windows-0078D6?style=for-the-badge&logo=windows&logoColor=white" alt="Windows Badge"/>
+</p>
 
-[Aquí va una captura de pantalla de la aplicación funcionando]
+<hr>
 
------
+<h2>🎯 Objetivo y Alcance</h2>
 
-## ✨ Características
+<p>
+    <strong>YTSorter</strong> es una aplicación de escritorio avanzada diseñada para gestionar y ordenar masivamente playlists de <strong>YouTube Music</strong>. 
+    Su prioridad es la seguridad de los datos y la flexibilidad del usuario.
+</p>
 
-  * **🔑 Autenticación Inteligente:** Pega tus headers y la app filtrará automáticamente lo necesario (Cookies, Auth) para conectar de forma segura, guardando tu sesión para el futuro.
-  * **🛡️ Modo Seguro y Anti-Duplicados:** Detecta y elimina canciones repetidas antes de procesar. Utiliza un sistema de subida "lento y seguro" para evitar bloqueos por parte de Google.
-  * **👁️ Previsualización en Tiempo Real:** "Trust but Verify". Revisa exactamente cómo quedará tu lista (con indicadores de subida/bajada) antes de crearla.
-  * **🎛️ Criterios Avanzados:** Ordena por Artista (normalizando acentos), Título, Álbum, Duración o Aleatorio real. Incluye opción de invertir orden (Z-A).
-  * **📦 Portable:** Código listo para ser empaquetado como un ejecutable `.exe` independiente.
+<p>
+    A diferencia de otras herramientas, YTSorter <strong>nunca modifica tus playlists originales</strong>. En su lugar, analiza la lista, 
+    permite previsualizar el nuevo orden y genera una <em>nueva</em> playlist ordenada en tu cuenta, garantizando que nunca pierdas tu curaduría original.
+</p>
 
------
+<hr>
 
-## 🚀 Cómo Instalar y Usar
+<h2>⚙️ Stack Tecnológico & Arquitectura</h2>
 
-Esta aplicación está diseñada para ejecutarse con Python. Sigue estos pasos sencillos:
+<p>El proyecto implementa <strong>Clean Architecture</strong> para asegurar un código mantenible y modular.</p>
 
-### 1\. Preparar el Entorno
+<table>
+ <thead>
+  <tr>
+   <th>Capa / Componente</th>
+   <th>Tecnología / Ruta</th>
+   <th>Descripción</th>
+  </tr>
+ </thead>
+ <tbody>
+  <tr>
+   <td><strong>Interface (GUI)</strong></td>
+   <td><code>src/interface/</code> (CustomTkinter)</td>
+   <td>Maneja la UI moderna (Dark Mode), hilos de ejecución para no congelar la ventana y feedback visual de progreso.</td>
+  </tr>
+  <tr>
+   <td><strong>Core (Dominio)</strong></td>
+   <td><code>src/core/</code> (Python Puro)</td>
+   <td>Contiene la lógica pura de ordenamiento (Entidades <code>Track</code> y algoritmos de normalización de texto).</td>
+  </tr>
+  <tr>
+   <td><strong>Infrastructure</strong></td>
+   <td><code>src/infrastructure/</code> (ytmusicapi)</td>
+   <td>Implementación de la comunicación con YouTube Music, manejo de sesión (<code>auth.json</code>) y subida por lotes.</td>
+  </tr>
+  <tr>
+   <td><strong>Empaquetado</strong></td>
+   <td>PyInstaller</td>
+   <td>Script de compilación automatizado (<code>build_exe.py</code>) para generar un ejecutable portable.</td>
+  </tr>
+ </tbody>
+</table>
 
-1.  **Clona el repositorio:**
+<hr>
 
-    ```bash
-    git clone https://github.com/martin-ratti/yt-sorter.git
-    cd yt-sorter
-    ```
+<h2>🚀 Características Principales</h2>
 
-2.  **Crea un entorno virtual e instala dependencias:**
+<ul>
+    <li><strong>🔑 Autenticación Inteligente</strong>: Sistema de login capaz de parsear y limpiar automáticamente los <em>Request Headers</em> crudos del navegador.</li>
+    <li><strong>🛡️ Modo Seguro (Non-Destructive)</strong>: Crea copias ordenadas (ej: <em>"Mi Lista [By Artist]"</em>) sin tocar la lista fuente.</li>
+    <li><strong>👁️ Previsualización en Vivo</strong>: Tabla interactiva que muestra el "Antes y Después" con indicadores de desplazamiento (▲ ▼) antes de confirmar.</li>
+    <li><strong>🎛️ Criterios de Ordenamiento</strong>:
+        <ul>
+            <li><strong>Artista / Álbum / Título:</strong> Con normalización de caracteres (ignora acentos/mayúsculas).</li>
+            <li><strong>Duración:</strong> De corta a larga.</li>
+            <li><strong>Shuffle:</strong> Aleatoriedad real.</li>
+            <li><strong>Inverso:</strong> Opción Z-A disponible para todos los criterios.</li>
+        </ul>
+    </li>
+    <li><strong>💾 Persistencia de Sesión</strong>: Guarda el token de acceso localmente para evitar re-autenticarse cada vez.</li>
+</ul>
 
-    ```bash
-    # Crear entorno
-    python -m venv venv
+<hr>
 
-    # Activar (Windows)
-    .\venv\Scripts\Activate
+<h2>🔑 Guía de Conexión (Setup Inicial)</h2>
 
-    # Instalar librerías
-    pip install -r requirements.txt
-    ```
+<p>Para que la aplicación pueda leer y crear playlists en tu cuenta, necesita una "cookie" válida. Solo se hace una vez:</p>
 
-### 2\. Ejecutar la Aplicación
+<ol>
+    <li>Abre <strong>music.youtube.com</strong> en tu navegador (Chrome/Edge/Firefox).</li>
+    <li>Abre las Herramientas de Desarrollador (<code>F12</code>) y ve a la pestaña <strong>Network</strong>.</li>
+    <li>Navega por la web (haz clic en "Biblioteca" o "Inicio") hasta que veas una petición llamada <code>browse</code>.</li>
+    <li>Haz clic en ella, busca la sección <strong>"Request Headers"</strong>, copia todo el bloque de texto y pégalo en YTSorter.</li>
+</ol>
 
-Simplemente corre el archivo principal:
+<hr>
 
-```bash
-python main.py
-```
+<h2>🛠️ Modo de Uso</h2>
 
-### 3\. (Opcional) Crear tu propio Ejecutable (.exe)
+<pre>
+/YTSorter
+├── YTSorter.exe       <-- La aplicación
+├── auth.json          <-- Tu sesión (se crea al loguearse)
+└── assets/            <-- Fuentes e iconos
+</pre>
 
-Si prefieres tener la aplicación como un archivo único para no abrir la terminal:
+<ol>
+    <li><strong>Conectar:</strong> Pega tus headers y haz clic en "Conectar".</li>
+    <li><strong>Seleccionar:</strong> Elige una playlist de tu biblioteca en el menú desplegable.</li>
+    <li><strong>Configurar:</strong> Elige el criterio (ej. <em>Artista</em>) y si deseas invertir el orden.</li>
+    <li><strong>Analizar:</strong> Presiona "Re-Analizar" para descargar la metadata y ver la previsualización.</li>
+    <li><strong>Confirmar:</strong> Si te gusta el resultado, presiona "Confirmar y Crear Playlist".</li>
+</ol>
 
-1.  Asegúrate de instalar PyInstaller: `pip install pyinstaller`.
-2.  Ejecuta el script de construcción incluido:
-    ```bash
-    python build_exe.py
-    ```
-3.  Encontrarás tu `YTSorter.exe` en la carpeta `/dist`.
+<hr>
 
------
+<h2>🧑‍💻 Setup para Desarrolladores</h2>
 
-## 🔑 Guía de Conexión (Solo primera vez)
+Si deseas modificar el código o compilar tu propia versión:
 
-Para gestionar tus listas, la aplicación necesita permiso temporal.
+<h3>1. Configuración del Entorno</h3>
+<pre><code># Clonar repositorio
+git clone https://github.com/martin-ratti/yt-sorter.git
 
-1.  Abre YouTube Music en tu navegador (F12 -\> Network).
-2.  Copia el bloque de "Request Headers" de cualquier petición (ej. `browse`).
-3.  Pégalo en la app y dale a "Conectar".
+# Crear entorno virtual
+python -m venv venv
+.\venv\Scripts\activate  # Windows
 
-> La app guardará un archivo local `auth.json` para que no tengas que repetir este paso.
+# Instalar dependencias
+pip install -r requirements.txt
+</code></pre>
 
------
+<h3>2. Ejecución en Desarrollo</h3>
+<pre><code>python main.py</code></pre>
 
-## ⚠️ Seguridad ante todo
+<h3>3. Compilación (.exe)</h3>
+<p>El proyecto incluye un script de construcción automatizado:</p>
+<pre><code>python build_exe.py</code></pre>
+<p><em>Esto generará el archivo <code>YTSorter.exe</code> en la carpeta <code>dist/</code> incluyendo todos los assets necesarios.</em></p>
 
-Esta herramienta **NUNCA** modifica ni borra tus playlists originales.
+<hr>
 
-  * Siempre crea una **nueva playlist** llamada `Nombre Original [Sorted by X]`.
-  * Esto garantiza que, pase lo que pase, tus datos originales estén a salvo. Tú decides cuándo borrar la lista vieja.
+<h2>⚖️ Créditos</h2>
 
-> 💡 Nota: El proceso de subida puede tardar unos minutos en listas largas (+400 canciones) debido a las pausas de seguridad para evitar errores de la API.
-
------
-
-## 🤝 Cómo Contribuir
-
-¡Las ideas son bienvenidas\! Si quieres añadir un nuevo criterio de ordenamiento:
-
-1.  **Fork y Clona:** Clona el repo en tu máquina.
-2.  **Añade la Lógica:** Modifica `src/core/entities.py` para agregar tu criterio en `sort_tracks`.
-3.  **Actualiza la UI:** Agrega el RadioButton en `src/interface/gui.py`.
-4.  **Pull Request:** Envía tus cambios para integrarlos.
-
------
-
-## 🧩 Tecnologías Utilizadas
-
-  * Python 3.10+ 🐍
-  * CustomTkinter (Interfaz Moderna)
-  * ytmusicapi (API Wrapper)
-  * PyInstaller (Empaquetado)
-
------
-
-## 📜 Licencia
-
-Este proyecto es de código abierto. Úsalo bajo tu propia responsabilidad. No está afiliado oficialmente con Google ni YouTube.
-
------
-
-Hecho con ❤️ por **[Martín Ratti](https://www.google.com/search?q=https://github.com/martin-ratti)**
+<p>
+    Desarrollado por <strong>Martín Ratti</strong>. Este proyecto no está afiliado con Google ni YouTube. Úsalo bajo tu propia responsabilidad.
+</p>
